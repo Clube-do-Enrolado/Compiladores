@@ -1,0 +1,5 @@
+my_var = 10
+my_var2=7
+
+if(my_var2 < 10):
+	print(my_var2)

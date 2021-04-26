@@ -1,0 +1,70 @@
+Autores: Vitor Acosta da Rosa			(22.218.006-9)
+	 Rubens de Araújo Rodrigues Mendes	(22.218.009-3)
+	 Rafael Zacarias Palierini		(22.218.030-9)
+	 Andy Silva Barbosa			(22.218.025-9)
+
+
+-- Instruções para o uso do arquivo dfa.py, responsável pela --
+ \    implementação de AFD que reconhecem expressões.        /
+---------------------------------------------------------------
+
+
+--> 1. Como foi estruturado
+
+A função de reconhecimento é simples, o foco principal
+são os dicionários encadeados que servem como as tabelas
+de transição. É importante que os dicionários mantenham 
+o padrão citado abaixo:
+    
+	expressao =    
+    	{
+    	Estado_0 : { "SimboloAceito": Prox_estado, ... "SimboloAceito": Prox_estado },
+            .               .            .         ...        .            .         ,
+        Estado_i : {        .            .         ...        .            .        },
+            .               .            .         ...        .            .         ,
+        Estado_f : {" ": -1}
+    	}
+
+Por exemplo, para uma expressão do tipo 0*1
+ 
+ 0 
+ |\        +--------+
++----+  1  | +----+ |
+| Q0 |-----| | Q1 | |
++----+	   | +----+ |
+	   +--------+
+
+o dicionário equivalente seria:
+
+meu_dicio = {
+	0: {"0":0, "1":1},
+	1: {" ":-1}
+}
+
+Perceba que existe, para o Estado_1 (chave externa), um dicionário com
+uma chave vazia (" ") com o valor -1. Essa combinação (" ":-1) serve
+como uma flag de um possível estado final. E é por essa flag que o
+algoritmo identifica se a sequência inserida pelo usuário é válida
+para aquele dicionário, ou melhor, para aquele AFD.
+
+
+--> 2. Como utilizar o algoritmo
+
+Ao executar o arquivo dfa.py, será apresentada uma tabela de opções
+referente à 3 AFDs diferentes (os mesmos apresentados pelo exercício 1).
+
+Por padrão, existem três dicionários:
+
+a_dict: responsável pela expressão 010
+b_dict: responsável pela expressão 0*|1*
+c_dict: responsável pela expressão 0*11+
+
+Logo, basta inserir, quando requerido, a opção correspondente
+à sequência de estudo desejada.
+Após escolher a opção (1 para a expressão 010, 2 para 0*|1* e 3 para 
+0*11+), digite a sequência que deve ser analisada (se é parte do AFD
+ou não).
+
+
+(Em caso de dúvidas e informações extras sobre a função
+recognize(), utilize help(recognize))
