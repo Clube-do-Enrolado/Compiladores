@@ -90,7 +90,6 @@ class Interpreter:
                       self.eat("\n")
                       resp = "\n"
                     else:
-                      print("ESSE CARA MORREU: ", self.current_token().type, " COM VALOR: ", self.current_token().value, " POS: ", self.pos)
                       if not need_response:
                         return self.invalid_error()
       
