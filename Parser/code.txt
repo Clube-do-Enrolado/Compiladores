@@ -1,0 +1,3 @@
+def uauu(arg1, arg2):
+	arg1 /= 2
+	return arg1 < (arg2 + 5)
