@@ -1,5 +1,5 @@
 from lexicalAnalyser import *
-from intsub import *
+from parser import *
 
 
 lexer = Lexer()
@@ -7,10 +7,8 @@ token_objs =[]
 
 
 with open('code.txt') as f:
-    obj = Interpreter(f.read())
+    token_list = lexer.getTokens(f.read())
 
 f.close()
 
-obj.decl(False)
-
-print(obj.return_a())
+interpreter = Interpreter(token_list)
