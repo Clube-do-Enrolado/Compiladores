@@ -1,6 +1,5 @@
 """
 Implementação do Parser Recursivo Descendente.
-
 Autores:
     
     Vitor Acosta da Rosa
@@ -8,7 +7,6 @@ Autores:
     Rafael Zacarias Palierini
     Geraldo Lucas do Amaral
     Andy da Silva Barbosa
-
 """
 
 class Interpreter():
@@ -32,15 +30,12 @@ class Interpreter():
     def eat(self):
         """
         Método que consome o token atual se for válido.
-
         Método que consome o token n de uma cadeia de n tokens
         de saida do analisador léxico, avançando para um token
         n + 1.
-
         Parameters:
         -----------
         None
-
         Returns:
         None
         """
@@ -92,39 +87,24 @@ class Interpreter():
     def decl_variavel(self):
         """
         Método que implementa a declaração de variaveis
-
         decl_variavel -> IDENTIFIER opr_atrib expr
                        | IDENTIFIER opr_atrib decl_input
-                       | IDENTIFIER opr_atrib IDENTIFIER (decl_param)
                        | IDENTIFIER( decl_param )
         """
 
         if self.current_token.type == "IDENTIFIER":
+            c = self.current_token
             self.eat()
             a = self.opr_atrib()                # Busca por operadores de atribuição.
             if a is not None:                   # se o operador de atribuição foi encontrado
+                b = self.expr()                 # tenta derivar uma expressão.
+                if b is not None:               # Se a derivação foi bem sucedida
+                    return (c,a,b)              # retorna a expressão reconhecida.
 
-                # Testa a atribuição de retorno de função
-                if self.current_token.type == "IDENTIFIER":
-                    self.eat()
-                    if self.current_token.type == "(":
-                        self.eat()
-                        b = self.decl_param()
-                        if self.current_token.type == ")":
-                            self.eat() 
-                            if b is not None:
-                                return ("IDENTIFIER",b)
-                            else:
-                                return ("IDENTIFIER()")
-                else:
-                    b = self.expr()                 # tenta derivar uma expressão.
-                    if b is not None:               # Se a derivação foi bem sucedida
-                        return ("IDENTIFIER",a,b)   # retorna a expressão reconhecida.
-
-                    else:                           # A declaração de expressão não foi concretizada.
-                        b = self.decl_input()       # Verifica se um input foi definido
-                        if b is not None:           # retorna a expressão reconhecida.
-                            return ("IDENTIFIER",a,b)
+                else:                           # A declaração de expressão não foi concretizada.
+                    b = self.decl_input()       # Verifica se um input foi definido
+                    if b is not None:           # retorna a expressão reconhecida.
+                        return (c,a,b)
             else:
                 if self.current_token.type == "(":
                     self.eat()
@@ -132,9 +112,9 @@ class Interpreter():
                     if self.current_token.type == ")":
                         self.eat() 
                         if b is not None:
-                            return ("IDENTIFIER",b)
+                            return (c,b)
                         else:
-                            return ("IDENTIFIER()")
+                            return c
 
         # Qualquer token/produção que não siga a definição da
         # gramática, retorna None
@@ -359,7 +339,6 @@ class Interpreter():
         Esse bloco serve para garantir a identação em
         expresões condicionais, laços de repetição e
         funções.
-
         bloco -> \n \t decl
                | \n \t decl_ret
                | \n \t BREAK
@@ -645,6 +624,7 @@ class Interpreter():
                 return a
             else:
                 return None
+    
 
     ####################################################
     ###             SIMBOLOS TERMINAIS               ###
@@ -654,32 +634,13 @@ class Interpreter():
         """
         Método que representa o símbolo terminal "expr_simples".
         """
-
         token = self.current_token
+        result = None
 
-        if token.type == "IDENTIFIER":
+        if token.type in ["IDENTIFIER","INTEGER","FLOAT","STRING","BOOLEAN"]:
             self.eat()
-            result = token.type
-
-        elif token.type == "INTEGER":
-            self.eat()
-            result = token.type
-
-        elif token.type == "FLOAT":
-            self.eat()
-            result = token.type
-
-        elif token.type == "STRING":
-            self.eat()
-            result = token.type
+            result = token
         
-        elif token.type == "BOOLEAN":
-            self.eat()
-            result = token.type
-
-        else:
-            result = None
-
         return result
 
     def opr_atrib(self): 
@@ -687,29 +648,11 @@ class Interpreter():
         Método que representa o símbolo terminal "opr_atrib".
         """
         token = self.current_token
-
-        if token.type == "+=":
-            self.eat()
-            result = token.type
-
-        elif token.type == "-=":
-            self.eat()
-            result = token.type
-
-        elif token.type == "*=":
-            self.eat()
-            result = token.type
-
-        elif token.type == "/=":
-            self.eat()
-            result = token.type
+        result = None
         
-        elif token.type == "=":
+        if token.type in ["+=","-=","*=","/=","="]: 
+            result = token
             self.eat()
-            result = token.type
-        
-        else:
-            result = None
 
         return result
 
@@ -718,26 +661,12 @@ class Interpreter():
         Método que representa o símbolo terminal "opr_arit".
         """
         token = self.current_token
+        result = None
 
-        if token.type == "+":
+        if token.type in ["+","-","*","/","="]:
             self.eat()
-            result = token.type
-
-        elif token.type == "-":
-            self.eat()
-            result = token.type
-
-        elif token.type == "*":
-            self.eat()
-            result = token.type
-
-        elif token.type == "/":
-            self.eat()
-            result = token.type
-
-        else:
-            result = None
-
+            result = token
+        
         return result
 
     def opr_comp(self):
@@ -746,33 +675,11 @@ class Interpreter():
         """
         
         token = self.current_token
+        result = None
 
-        if token.type == "<":
+        if token.type in ["<","<=",">",">=","==","!="]:
             self.eat()
-            result = token.type
-
-        elif token.type == "<=":
-            self.eat()
-            result = token.type
-
-        elif token.type == ">":
-            self.eat()
-            result = token.type
-
-        elif token.type == ">=":
-            self.eat()
-            result = token.type
-        
-        elif token.type == "==":
-            self.eat()
-            result = token.type
-    
-        elif token.type == "!=":
-            self.eat()
-            result = token.type
-    
-        else:
-            result = None
+            result = token
 
         return result
 
@@ -781,24 +688,10 @@ class Interpreter():
         Método que representa o símbolo terminal "opr_logi".
         """
         token = self.current_token
+        result = None
 
-        if token.type == "AND":
+        if token.type in ["AND","OR","NOT","IN"]:
             self.eat()
-            result = token.type
-
-        elif token.type == "OR":
-            self.eat()
-            result = token.type
-
-        elif token.type == "NOT":
-            self.eat()
-            result = token.type
-
-        elif token.type == "IN":
-            self.eat()
-            result = token.type
-
-        else:
-            result = None
+            result = token
 
         return result
