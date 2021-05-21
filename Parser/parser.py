@@ -1,5 +1,6 @@
 """
 Implementação do Parser Recursivo Descendente.
+
 Autores:
     
     Vitor Acosta da Rosa
@@ -7,6 +8,7 @@ Autores:
     Rafael Zacarias Palierini
     Geraldo Lucas do Amaral
     Andy da Silva Barbosa
+
 """
 
 class Interpreter():
@@ -26,6 +28,32 @@ class Interpreter():
 
     def invalid_error(self, message):
         raise Exception(message)
+
+    def retreat(self, flag):
+        """
+        Método para voltar o token atual para um token definido pela flag.
+
+        Parameters:
+        -----------
+        flag(int): Posição que acessa a lista de tokens.
+        Utilizado para retornar a um "checkpoint".
+
+        Returns:
+        None
+        """
+        # Retorna o token atual para o token ativo pela flag
+        self.current_token = self.token_list[flag]
+        # Salva a posição da flag para iteração
+        i = flag
+        # Retira os tokens consumidos erroneamentes
+        while i < self.pos:
+            self.recognized.pop()
+            i+=1
+        # Retorna a posição
+        self.pos = flag
+        # Reativa o loop se necessário
+        if self.loop == 0:
+            self.loop = 1
 
     def eat(self):
         """
@@ -364,7 +392,6 @@ class Interpreter():
 
     
         return None         # retorna None para nova avaliação.
-                                
 
     def decl_ret(self):
         """
@@ -445,8 +472,6 @@ class Interpreter():
                 return "IDENTIFIER"
         return None
         
-
-
     def decl_range(self):
         """
         Método que resolve a declaração de um RANGE
@@ -506,48 +531,41 @@ class Interpreter():
     def expr(self):
         """
         Método que resolve a gramática de uma expressão.
-        expr -> (expr)
-              | expr_comp
+        expr -> expr_comp
               | expr_arit
               | expr_logi
               | expr_simples
         """
-        if(self.current_token.type == "("):
-            self.eat() # Consome o parenteses (
-            a = self.expr()  # Resolve toda expressão dentro dos parênteses
-            self.eat() # Consome o parenteses )
-            b = self.expr() # Resolve nova expressão (se existir)
-            if b is not None:
-                return (a, b)  # Deve retornar a árvore de a,b
-            else:
-                return a # Deve retornar somente a expressão dentro dos parenteses
-        else:
-            # Se não começar com (, tenta encaixar em outra derivação
-            return self.expr_comp()
+
+        # Percorre todas as expressões possíveis
+        expressions = [expr_comp, expr_arit, expr_logi, expr_simples]
+        for producao in expressions:
+            try:
+                a = producao()
+                       
+                if a is not None:
+                    return a
+            except:
+                return
+
 
     def expr_comp(self):
         """
         Método que implementa uma expressão de comparação
-        expr_comp -> expr_simples opr_comp expr
+        expr_comp -> expr_simples opr_comp expr_simples
         """
-
+        # Salva o token atual (utilizado para o retreat se necessario)
+        flag = self.current_token
         # Tenta a derivação para uma expressão simples
-        # perceba que o resto da derivação não depende necessariamente
-        # do resultado desta derivação. Isso porque pode acontecer
-        # quando expr recebe um operador (aritmético, comparação, lógico).
         a = self.expr_simples()
-        
         # Tenta derivar para operador de comparação
         opr_resp = self.opr_comp()
         # Caso esse operador seja um operador de comparação
         if opr_resp is not None:
-            resposta = self.expr()
+            b = self.expr_simples()
             # Toda expressão foi montada corretamente
-            if resposta:
-                if a is not None:
-                    return (a, opr_resp, resposta)
-                else:
-                    return (opr_resp, resposta)
+            if b:
+                return (a, opr_resp, b)
 
             # A expressão não foi montada corretamente
             # (a expressão final não retornou resposta)
@@ -556,29 +574,26 @@ class Interpreter():
 
         # Se não for um operador de comparação
         else:
-            if a is not None:
-                b = self.expr_arit()
-                if b is not None:
-                    return (a, b)
-                else:
-                    return a
-            else:
-                return self.expr_arit()
+            # Vomita o token consumido na derivação imediatamente anterior
+            # para uma nova derivação (expr_arit, expr_logi, expr_simples)
+            self.retreat(flag)
+            return None
 
     def expr_arit(self):
         """
         Método que implementa uma expressão aritmética
-        expr_arit -> expr_simples opr_arit expr
+        expr_arit -> expr_simples opr_arit expr_simples
         """
+        # Salva o token atual (utilizado para o retreat se necessario)
+        flag = self.current_token
+        # Tenta a derivação para uma expressão simples
         a = self.expr_simples()
+
         opr_resp = self.opr_arit()
         if opr_resp is not None:                    # Existe um operador aritmético
-            resposta = self.expr()                  # busca por uma expressão complementar.
-            if resposta:                            # Se existe a expressão após o operador
-                if a is not None:                   # e existe um simbolo terminal inicial
-                    return (a, opr_resp, resposta)  # retorna o simbolo terminal, o operador e a expressão.
-                else:                               # Caso contrário, 
-                    return (opr_resp, resposta)     # retorna somente o operador e a expressão.
+            b = self.expr_simples()
+            if b:                                   # Se existe a expressão após o operador
+                return (a, opr_resp, b)             # retorna o simbolo terminal, o operador e a expressão.
 
             # A expressão não foi montada corretamente
             # (a expressão final não retornou resposta)
@@ -587,52 +602,37 @@ class Interpreter():
 
 	# Se o operador não for um aritmético
         else:
-            if a is not None:
-                b = self.expr_logi()
-                if b is not None:
-                    return (a, b)
-                else:
-                    return a
-            else:
-                # Verifica se a expressão é lógica
-                return self.expr_logi()
+            # Vomita o último token consumido para uma nova análise
+            self.retreat(flag)
+            return None
 
     def expr_logi(self):
         """
         Método que implementa uma expressão aritmética
-        expr_logi -> expr_simples opr_logi expr
+        expr_logi -> expr_simples opr_logi expr_simples
         """
-
+        # Salva o token atual (utilizado para o retreat se necessario)
+        flag = self.current_token
+        # Tenta derivar uma expressão simples
         a = self.expr_simples()
 
         opr_resp = self.opr_logi()
         if opr_resp is not None:                    # Se existe um operador lógico
-            resposta = self.expr()                  # tenta encontrar uma expressão. 
-            if resposta is not None:                # Se existe uma expressão  
-                if a is not None:                   # e um simbolo terminal anterior
-                    return (a, opr_resp, resposta)  # retorna o simbolo terminal, o operador e a expressão.
-                else:                               # Caso não exista um simbolo terminal inicial
-                    return (opr_resp, resposta)     # retorna somente o operador e a expressão.
+            b = self.expr_simples()
+            if b is not None:                       # Se existe uma expressão  
+                return (a, opr_resp, b)             # retorna o simbolo terminal, o operador e a expressão.
 
             # A expressão não foi montada corretamente
             else:
                 return None
         else:
-            # Caso não reconheça um operador lógico
-            # recorre ao símbolo terminal expr_simples (se existir)
-            if a is not None:
-                return a
-            else:
-                return None
-    
-
-    ####################################################
-    ###             SIMBOLOS TERMINAIS               ###
-    ####################################################
+            self.retreat(flag)
+            return None 
 
     def expr_simples(self):
         """
-        Método que representa o símbolo terminal "expr_simples".
+        Método que representa o símbolo "expr_simples".
+        expr_simples -> IDENTIFIER|INTEGER|FLOAT|STRING|BOOLEAN|(expr)
         """
         token = self.current_token
         result = None
@@ -641,8 +641,19 @@ class Interpreter():
             self.eat()
             result = token
         
+        else:
+            if self.current_token.type == "(":
+                self.eat() # Consome o parenteses (
+                result = self.expr()  # Resolve toda expressão dentro dos parênteses
+                self.eat() # Consome o parenteses )
+                 
         return result
 
+
+    ####################################################
+    ###             SIMBOLOS TERMINAIS               ###
+    ####################################################
+    
     def opr_atrib(self): 
         """
         Método que representa o símbolo terminal "opr_atrib".
