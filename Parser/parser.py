@@ -11,6 +11,129 @@ Autores:
 
 """
 
+
+class AST(object):
+    pass
+
+class BinOp(AST):
+    """
+    Classe representando uma operação binária.
+
+    A árvore fica da seguinte maneira:
+                operador
+               /        \\
+            left       right
+
+    Sendo o operador [+,-,/,*,+=,-=,/=,*=,=,<=,<,>,>=,==,in,and,not,in]
+    """
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+
+    def solve(self):
+         return f'{self.left} {self.op} {self.right}' 
+
+class DeclOp(AST):
+    """
+    Classe representando a declaração.
+
+    A ávore fica da seguinte maneira:
+                operador
+               /        \\
+            left       right
+
+    Sendo o operador =.
+    """
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+
+    def solve(self):
+         return f'{self.left} {self.op} {self.right}' 
+
+class DeclParam(AST):
+    """
+    Classe representando a declaração de parâmetros.
+    Todos são nós folhas, pois a declaração de parâmetros
+    terá pais em diferentes locais.     
+    """
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def solve(self):
+        return f'{self.left} {self.right}'
+
+class DeclFor(AST):
+    """
+    Classe representando a declaração de um for.
+
+    A árvore fica da seguinte forma:
+                    for
+                   /  \\     
+                  /    \\
+                in     DeclBlock
+               /  \\
+            Node  Node|DeclRange
+    """
+    def __init__(self, left, op, right):
+        self.left = left
+        self.op = op
+        self.right = right
+
+    def solve(self):
+        return f'{self.left} {self.op} {self.right}'
+
+class DeclRange(AST):
+    """
+    Classe representando a declaração de range.
+    
+    A árvore fica da seguinte forma:
+
+                    range
+                   /  |  \\
+                Node Node Node
+    
+    Sendo os nós folhas os intervalos do range.
+    """
+    def __init__(self, left, mid, father, right):
+        self.left = left
+        self.mid = mid
+        self.father = father
+        self.right = right
+
+    def solve(self):
+        return f'{self.left} {self.mid} {self.father} {self.right}'
+
+
+class DeclFuncCall(AST):
+    """
+    Classe representado a chamada de uma função.
+
+    A árvore será estruturada da seguinte maneira:
+            identifier                                       identifier
+                |          ou, de maneira equivalente       /   ..... \\
+            DeclParam                                     Node  .....  Node
+    """
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+
+    def solve(self):
+        return f'{self.left} {self.right}'
+
+class Node(AST):
+    """
+    Classe representando terminais.
+    """
+    def __init__(self, token):
+        self.token = token
+
+    def solve(self):
+        return f' {self.token.value} '
+
 class Interpreter():
     def __init__(self, token_list):
 
@@ -92,10 +215,18 @@ class Interpreter():
 
         print("Reconhecidos: ",self.recognized)
 
+
     def decl(self, consider_newline):
         """
         Método referente ao símbolo inicial decl da linguagem.
         Pode derivar para outros sete símbolos não terminais.
+        
+        Parameters:
+        -----------
+        consider_newline(Boolean): Variável de controle que verifica se o
+        token '\n' deve ser considerado na atual execução.
+
+        Return:
         """
         nao_terminais = [self.decl_variavel, self.decl_if, self.decl_elif, self.decl_else,\
                 self.decl_for, self.decl_while, self.decl_func, self.decl_print, self.decl_input]
@@ -127,12 +258,14 @@ class Interpreter():
             if a is not None:                   # se o operador de atribuição foi encontrado
                 b = self.expr()                 # tenta derivar uma expressão.
                 if b is not None:               # Se a derivação foi bem sucedida
-                    return (c,a,b)              # retorna a expressão reconhecida.
+                    node = DeclOp(c, a, b)
+                    return node                 # retorna a expressão reconhecida.
 
                 else:                           # A declaração de expressão não foi concretizada.
                     b = self.decl_input()       # Verifica se um input foi definido
                     if b is not None:           # retorna a expressão reconhecida.
-                        return (c,a,b)
+                        node = DeclOp(c,a,b)
+                        return node
             else:
                 if self.current_token.type == "(":
                     self.eat()
@@ -140,9 +273,10 @@ class Interpreter():
                     if self.current_token.type == ")":
                         self.eat() 
                         if b is not None:
-                            return (c,b)
+                            node = DeclFuncCall(Node(c),b) 
+                            return node
                         else:
-                            return c
+                            return Node(c)
 
         # Qualquer token/produção que não siga a definição da
         # gramática, retorna None
@@ -155,31 +289,34 @@ class Interpreter():
         """
         # Posição relativa em relação à declaração.
         rel_pos = 0
-        # Possível retorno de declaração de range, pode ser usado ou não.
-        a = None
-        b = None
+        rng = None
+        c = None
         # Enquanto o ponteiro "rel_pos" não chegar à última posição 5, avalia
         while rel_pos < 6:
             if self.current_token.type == "FOR" and rel_pos == 0:
+                declpai = self.current_token
                 self.eat() # Consome o token FOR
                 rel_pos+=1
             
             elif self.current_token.type == "IDENTIFIER" and rel_pos == 1:
+                a = self.current_token
                 self.eat() # Consome o token IDENTIFIER
                 rel_pos+=1
 
             elif self.current_token.type == "IN" and rel_pos == 2:
+                b = self.current_token
                 self.eat() # Consome o token IN
                 rel_pos+=1
 
             # Verifica se a sintaxe segue STRING ou decl_range na posição 3
             elif rel_pos == 3:
                 if self.current_token.type == "STRING": 
+                    c = self.current_token
                     self.eat()            # Consome o token STRING
                     rel_pos+=1
                 else:
-                    a = self.decl_range() # Tenta derivar para a declaração de range
-                    if a is not None:     # se a derivação foi feita com sucesso 
+                    rng = self.decl_range() # Tenta derivar para a declaração de range
+                    if rng is not None:     # se a derivação foi feita com sucesso 
                         rel_pos+=1        # avança o "ponteiro".
                     else:                 # A sintaxe não utilizou STRING nem decl_range
                         return None       # portanto é inválida.
@@ -189,22 +326,22 @@ class Interpreter():
                 rel_pos+=1
 
             elif rel_pos == 5:
-                b = self.bloco() # Derivação do conteúdo do FOR, obrigatório
+                block = self.bloco() # Derivação do conteúdo do FOR, obrigatório
                 rel_pos+=1       # retorno diferente de None.
 
             else:
                 return None
 
-        if b is not None:
-            if a is None:   # Se o FOR baseou-se em STRING
-                return b    # retorna somente o bloco
-            else:           # Se o FOR baseou-se em RANGE
-                return (a,b)# retorna o range e o bloco
-        
-        # Caso nenhuma condição foi satisfeita
-        else:
-            # O FOR não é aplicável.
-            return None
+        if block is not None:
+            if rng is not None:  # Se o FOR baseou-se em RANGE
+                node = DeclFor(rng,Node(declpai),block)
+                return node      # retorna somente o bloco
+            elif c is not None:  # Se o FOR baseou-se em STRING 
+                innernode = BinOp(Node(a),Node(b),Node(c))
+                node = DeclFor(innernode,Node(declpai),block)
+                return node
+            
+        return None
 
 
     def decl_while(self):
@@ -409,26 +546,18 @@ class Interpreter():
     def decl_input(self):
         """
         Método que resolve a declaração de um INPUT.
-        decl_input -> INPUT(expr)
-                    | INPUT()
+        decl_input -> INPUT()
         """
 
         if self.current_token.type == "INPUT":
+            a = self.current_token
             self.eat()                                 # Consome o token INPUT.
             if self.current_token.type == "(":         # Verifica o token (
                 self.eat()                             # consome o token (
-                resposta = self.expr()                 # Tenta derivação de uma expressão
-                if resposta is not None:               # caso a derivação funcione
-                    if self.current_token.type == ")": # tenta fechar o parentese
-                        self.eat()                     # consome o token )
-                        return resposta                # retorna a expressão.
-                    else:                              # Se não fechou parenteses
-                        return None                    # retorna erro!
-
-                else: # Caso não tenha uma expressão, tenta somente os parênteses.
-                    if self.current_token.type == ")":
-                        self.eat()
-                        return "INPUT()"
+                if self.current_token.type == ")":     # tenta fechar o parentese
+                    self.eat()                         # consome o token )
+                    node = Node(a)
+                    return node                        # retorna a expressão.
 
         return None
 
@@ -461,23 +590,22 @@ class Interpreter():
                     | IDENTIFIER, decl_param
         """
         if self.current_token.type == "IDENTIFIER":
+            b = self.current_token
             self.eat()
             if self.current_token.type == ",":
                 self.eat()
                 a = self.decl_param()
 
                 if a is not None:
-                    return a
+                    return DeclParam(Node(b),a)
             else:
-                return "IDENTIFIER"
+                return Node(b)
         return None
         
     def decl_range(self):
         """
         Método que resolve a declaração de um RANGE
-        decl_range -> RANGE ( INTEGER|FLOAT )
-                    | RANGE ( INTEGER|FLOAT, INTEGER|FLOAT )
-                    | RANGE ( INTEGER|FLOAT, INTEGER|FLOAT, INTEGER|FLOAT ) 
+        decl_range -> RANGE ( INTEGER|FLOAT, INTEGER|FLOAT, INTEGER|FLOAT ) 
         """
         # Posição relativa à sintaxe do range, serve para
         # visitar cada lexema a fim de verificar a correta estruturação.
@@ -489,41 +617,40 @@ class Interpreter():
         while rel_pos < 6:
 
             if self.current_token.type == "RANGE" and rel_pos == 0:
+                range_resp.append(self.current_token)
                 self.eat()
                 rel_pos+=1
-                range_resp.append("RANGE")
 
             elif self.current_token.type == "(" and rel_pos == 1:
                 self.eat()
                 rel_pos+=1
 
-            elif rel_pos == 2 and (self.current_token.type == "INTEGER" or self.current_token.type == "FLOAT"):
-                    self.eat() # Consome INTEGER
+            elif rel_pos == 2 and (self.current_token.type == "INTEGER" or self.current_token.type == "FLOAT" or self.current_token.type == "IDENTIFIER"):
+                    range_resp.append(self.current_token)
+                    self.eat() 
                     rel_pos+=1
                     if self.current_token.type == ",":
                         self.eat() # Consome ,
-                    range_resp.append(self.current_token.type)
+                        rel_pos+=1
 
-            elif rel_pos == 3 and (self.current_token.type == "INTEGER" or self.current_token.type == "FLOAT"):
+            elif rel_pos == 3 and (self.current_token.type == "INTEGER" or self.current_token.type == "FLOAT" or self.current_token.type == "IDENTIFIER"):
+                    range_resp.append(self.current_token)
                     self.eat()
-                    rel_pos+=1
                     if self.current_token.type == ",":
                         self.eat() # Consome ,
-                    range_resp.append(self.current_token.type)
+                        rel_pos+=1
 
-            elif rel_pos == 4 and (self.current_token.type == "INTEGER" or self.current_token.type == "FLOAT"):
+            elif rel_pos == 4 and (self.current_token.type == "INTEGER" or self.current_token.type == "FLOAT" or self.current_token.type == "IDENTIFIER"):
+                    range_resp.append(self.current_token)
                     self.eat()
                     rel_pos+=1
-                    range_resp.append(self.current_token.type)
 
-            # O intervalo de posições é [3,5]
-            # pois é possível o range contar com somente um argumento (posição 3),
-            # dois argumentos (posições 3 e 4) ou três (posições 3,4 e 5).
-            elif rel_pos > 2 and rel_pos < 6:
+            elif rel_pos == 5:
                 # Fecha o range com parênteses
                 if self.current_token.type == ")":
                     self.eat()
-                    return range_resp
+                    node = DeclRange(Node(range_resp[1]),Node(range_resp[0]),Node(range_resp[2]),Node(range_resp[3]))
+                    return node
 
             else:
                 return None
@@ -536,18 +663,15 @@ class Interpreter():
               | expr_logi
               | expr_simples
         """
-
         # Percorre todas as expressões possíveis
-        expressions = [expr_comp, expr_arit, expr_logi, expr_simples]
+        expressions = [self.expr_comp, self.expr_arit, self.expr_logi, self.expr_simples]
         for producao in expressions:
             try:
-                a = producao()
-                       
+                a = producao() 
                 if a is not None:
                     return a
             except:
                 return
-
 
     def expr_comp(self):
         """
@@ -555,7 +679,7 @@ class Interpreter():
         expr_comp -> expr_simples opr_comp expr_simples
         """
         # Salva o token atual (utilizado para o retreat se necessario)
-        flag = self.current_token
+        flag = self.pos
         # Tenta a derivação para uma expressão simples
         a = self.expr_simples()
         # Tenta derivar para operador de comparação
@@ -565,7 +689,8 @@ class Interpreter():
             b = self.expr_simples()
             # Toda expressão foi montada corretamente
             if b:
-                return (a, opr_resp, b)
+                node = BinOp(Node(a), opr_resp, b) 
+                return node                         # retorna o simbolo terminal, o operador e a expressão.
 
             # A expressão não foi montada corretamente
             # (a expressão final não retornou resposta)
@@ -585,7 +710,7 @@ class Interpreter():
         expr_arit -> expr_simples opr_arit expr_simples
         """
         # Salva o token atual (utilizado para o retreat se necessario)
-        flag = self.current_token
+        flag = self.pos
         # Tenta a derivação para uma expressão simples
         a = self.expr_simples()
 
@@ -593,7 +718,8 @@ class Interpreter():
         if opr_resp is not None:                    # Existe um operador aritmético
             b = self.expr_simples()
             if b:                                   # Se existe a expressão após o operador
-                return (a, opr_resp, b)             # retorna o simbolo terminal, o operador e a expressão.
+                node = BinOp(Node(a), opr_resp, b) 
+                return node                         # retorna o simbolo terminal, o operador e a expressão.
 
             # A expressão não foi montada corretamente
             # (a expressão final não retornou resposta)
@@ -612,15 +738,16 @@ class Interpreter():
         expr_logi -> expr_simples opr_logi expr_simples
         """
         # Salva o token atual (utilizado para o retreat se necessario)
-        flag = self.current_token
+        flag = self.pos
         # Tenta derivar uma expressão simples
         a = self.expr_simples()
 
         opr_resp = self.opr_logi()
         if opr_resp is not None:                    # Se existe um operador lógico
             b = self.expr_simples()
-            if b is not None:                       # Se existe uma expressão  
-                return (a, opr_resp, b)             # retorna o simbolo terminal, o operador e a expressão.
+            if b is not None:                       # Se existe uma expressão
+                node = BinOp(Node(a), opr_resp, b)
+                return node                         # retorna o simbolo terminal, o operador e a expressão.
 
             # A expressão não foi montada corretamente
             else:
@@ -639,7 +766,7 @@ class Interpreter():
 
         if token.type in ["IDENTIFIER","INTEGER","FLOAT","STRING","BOOLEAN"]:
             self.eat()
-            result = token
+            result = Node(token)
         
         else:
             if self.current_token.type == "(":
