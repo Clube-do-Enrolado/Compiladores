@@ -170,6 +170,15 @@ class Interpreter():
     def invalid_error(self, message):
         raise Exception(message)
 
+    def expand_tuple(self, a, l):
+        for b in a:
+            if isinstance(b,tuple):
+                expand_tuple(b,l)
+            else:
+                l.append(b)
+
+        return l
+
     def retreat(self, flag):
         """
         Método para voltar o token atual para um token definido pela flag.
@@ -224,15 +233,15 @@ class Interpreter():
         serem consumidos. Caso todas as derivações possíveis
         falhem, o loop é quebrado.
         """
+        a = []
         while self.loop:
             try:
-                print(self.decl(True))
-                print(self.recognized)
+                a.append(self.decl(True))
             except:
                 return
 
         print("Reconhecidos: ",self.recognized)
-
+        print([x for x in a])
 
     def decl(self, consider_newline):
         """
@@ -291,7 +300,13 @@ class Interpreter():
                     if self.current_token.type == ")":
                         self.eat() 
                         if b is not None:
-                            node = DeclFuncCall(Node(c),b) 
+                            print("Ola o b: ",b)
+                            if isinstance(b,tuple):
+                                l = self.expand_tuple(b,[])
+                                print("Aqui: ",l)
+                                node = DeclFuncCall(Node(c),l)
+                            else:
+                                node = DeclFuncCall(Node(c),Node(b)) 
                             return node
                         else:
                             return Node(c)
@@ -442,6 +457,7 @@ class Interpreter():
         decl_if -> IF expr : bloco [decl_elif|decl_else]
         """
         if self.current_token.type == "IF":
+            c = self.current_token
             self.eat()
             a = self.expr()
             if a is None:   # Caso o IF não possua uma expressão
@@ -451,11 +467,11 @@ class Interpreter():
                 self.eat()
                 
                 b = self.bloco() 
-
                 if b is None:   # O conteúdo dentro do IF não pode
                     return None # ser vazio, retorne None.
-
                 else:                            # Se existe conteúdo dentro do if, é possível
+                    l = self.expand_tuple(b,[])
+
                     elif_resp = self.decl_elif() # utilizar um elif,
                     if elif_resp is not None:
                         return (a,b,elif_resp)
@@ -465,7 +481,7 @@ class Interpreter():
                             return (a,b,else_resp)
 
                         else:
-                            return (a,b)         # ou somente a estrutura do IF.
+                            return (a,c,l)         # ou somente a estrutura do IF.
 
     def decl_elif(self):
         """
@@ -534,41 +550,9 @@ class Interpreter():
                     self.eat()      # Consome \t
 
                 if self.current_token.type == "BREAK":
+                    c = self.current_token
                     self.eat()      # Consome BREAK
-                    return "BREAK"  # retorna o token reconhecido.
-
-                a = self.decl_ret() # Tenta derivar para uma declaração de retorno.
-                if a is not None:   # Caso a tentativa retorne sucesso
-                    return a        # retorna a resposta da derivação
-
-                a = self.decl(False) # Tenta derivar para uma declaração genérica.
-                if a is not None:   # Se a tentativa retornar sucesso
-                    b = self.bloco()
-                    return (a,b)        # retorna a resposta da derivação
-
-    
-        return None         # retorna None para nova avaliação.
-
-    def bloco_sub(self):
-        
-        """
-        Método que identifica um bloco de expressões.
-        Esse bloco serve para garantir a identação em
-        expresões condicionais, laços de repetição e
-        funções.
-        bloco -> \n \t decl
-               | \n \t decl_ret
-               | \n \t BREAK
-        """
-        if self.current_token.type == "\n":
-            self.eat()              # Consome \n
-            if self.current_token.type == "\t": 
-                while self.current_token.type == "\t":
-                    self.eat()      # Consome \t
-
-                if self.current_token.type == "BREAK":
-                    self.eat()      # Consome BREAK
-                    return "BREAK"  # retorna o token reconhecido.
+                    return Node(c)  # retorna o token reconhecido.
 
                 a = self.decl_ret() # Tenta derivar para uma declaração de retorno.
                 if a is not None:   # Caso a tentativa retorne sucesso
@@ -578,11 +562,13 @@ class Interpreter():
                 if a is not None:   # Se a tentativa retornar sucesso
                     b = self.bloco()
                     if b is not None:
-                        # a e b devem ser ligados por um nó "BLOCO".
                         return (a,b)        # retorna a resposta da derivação
+                    else:
+                        return a
 
     
         return None         # retorna None para nova avaliação.
+
 
     def decl_ret(self):
         """
@@ -655,7 +641,7 @@ class Interpreter():
                 a = self.decl_param()
 
                 if a is not None:
-                    return DeclParam(Node(b),a)
+                    return (Node(b),a)
             else:
                 return Node(b)
         return None
