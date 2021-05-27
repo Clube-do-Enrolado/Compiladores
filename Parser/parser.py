@@ -66,6 +66,24 @@ class DeclParam(AST):
     def solve(self):
         return f'{self.left} {self.right}'
 
+class DeclPrint(AST):
+
+    def __init__(self, op, left):
+        self.op = op   # print
+        self.left = left # expr
+
+    def solve(self):
+        return f'{self.left} {self.op}'
+
+class DeclRet(AST):
+
+    def __init__(self, op, left):
+        self.op = op   # return
+        self.left = left # expr
+
+    def solve(self):
+        return f'{self.left} {self.op}'
+
 class DeclFor(AST):
     """
     Classe representando a declaração de um for.
@@ -487,12 +505,13 @@ class Interpreter():
         decl_else -> ELSE : bloco
         """
         if self.current_token.type == "ELSE":
+            a = self.current_token
             self.eat()                   # Consome o token ELSE
             if self.current_token.type == ":":
                 self.eat()               # Consome o token :
-                a = self.bloco()         # Tenta derivar um bloco
-                if a is not None:        # Caso a derivação seja bem sucedida
-                    return ("ELSE",a)    # retorna o ELSE mais o bloco.
+                b = self.bloco()         # Tenta derivar um bloco
+                if b is not None:        # Caso a derivação seja bem sucedida
+                    return (a,b)    # retorna o ELSE mais o bloco.
                 else:
                     return None
         else:
@@ -530,16 +549,53 @@ class Interpreter():
     
         return None         # retorna None para nova avaliação.
 
+    def bloco_sub(self):
+        
+        """
+        Método que identifica um bloco de expressões.
+        Esse bloco serve para garantir a identação em
+        expresões condicionais, laços de repetição e
+        funções.
+        bloco -> \n \t decl
+               | \n \t decl_ret
+               | \n \t BREAK
+        """
+        if self.current_token.type == "\n":
+            self.eat()              # Consome \n
+            if self.current_token.type == "\t": 
+                while self.current_token.type == "\t":
+                    self.eat()      # Consome \t
+
+                if self.current_token.type == "BREAK":
+                    self.eat()      # Consome BREAK
+                    return "BREAK"  # retorna o token reconhecido.
+
+                a = self.decl_ret() # Tenta derivar para uma declaração de retorno.
+                if a is not None:   # Caso a tentativa retorne sucesso
+                    return a        # retorna a resposta da derivação
+
+                a = self.decl(False) # Tenta derivar para uma declaração genérica.
+                if a is not None:   # Se a tentativa retornar sucesso
+                    b = self.bloco()
+                    if b is not None:
+                        # a e b devem ser ligados por um nó "BLOCO".
+                        return (a,b)        # retorna a resposta da derivação
+
+    
+        return None         # retorna None para nova avaliação.
+
     def decl_ret(self):
         """
         Método que resolve a declaração de um RETURN
         decl_ret -> RETURN expr
         """
         if self.current_token.type == "RETURN":
+            a = self.current_token
             self.eat()      # Consome o token RETURN
-            a = self.expr()
-            if a is not None:
-                return a
+            c = self.expr()
+            if c is not None:
+                node = DeclRet(a,c)
+                return node
         # Caso a declaração não foi realizada de forma satisfatória
         return None 
     
@@ -568,6 +624,7 @@ class Interpreter():
         """
 
         if self.current_token.type == "PRINT":
+            a = self.current_token
             self.eat()                                 # Consome o token PRINT.
             if self.current_token.type == "(":         # Verifica o token (
                 self.eat()                             # consome o token (
@@ -575,7 +632,8 @@ class Interpreter():
                 if resposta is not None:               # caso a derivação funcione
                     if self.current_token.type == ")": # tenta fechar o parentese
                         self.eat()                     # consome o token )
-                        return resposta                # retorna a expressão.
+                        node = DeclPrint(a,resposta)
+                        return node                    # retorna a expressão.
                     else:                              # Se não fechou parenteses
                         return None                    # retorna erro!
             else:
@@ -649,7 +707,7 @@ class Interpreter():
                 # Fecha o range com parênteses
                 if self.current_token.type == ")":
                     self.eat()
-                    node = DeclRange(Node(range_resp[1]),Node(range_resp[0]),Node(range_resp[2]),Node(range_resp[3]))
+                    node = DeclRange(Node(range_resp[1]),Node(range_resp[2]),Node(range_resp[0]),Node(range_resp[3]))
                     return node
 
             else:
@@ -801,7 +859,7 @@ class Interpreter():
         token = self.current_token
         result = None
 
-        if token.type in ["+","-","*","/","="]:
+        if token.type in ["+","-","*","/"]:
             self.eat()
             result = token
         
