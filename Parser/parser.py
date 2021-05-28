@@ -53,32 +53,95 @@ class DeclOp(AST):
     def solve(self):
          return f'{self.left} {self.op} {self.right}' 
 
-class DeclParam(AST):
+class DeclIf(AST):
     """
-    Classe representando a declaração de parâmetros.
-    Todos são nós folhas, pois a declaração de parâmetros
-    terá pais em diferentes locais.     
+    Classe representando a árvore de
+    uma declaração de if.
+                if
+              / | \\
+             /  |  \\
+            / block \\ 
+         expr    [elif|else]
     """
-    def __init__(self, left, right):
+    def __init__(self, expr, op, block, nested = None):
+        self.expr = expr
+        self.op = op
+        self.block = block
+        self.nested = nested
+
+    def solve(self):
+        return f' {self.expr} {self.op} {self.block} {self.nested} '
+
+class DeclElif(AST):
+    """
+    Classe representando a árvore de
+    uma declaração de elif
+               elif
+             /  |  \\
+            /   |   \\
+           /    |    \\
+          expr  |  [elif|else]
+              block
+
+    """
+    def __init__(self, expr, op, block, nested = None):
+        self.expr = expr
+        self.op = op
+        self.block = block
+        self.nested = nested
+
+    def solve(self):
+        return f' {self.expr} {self.op} {self.block} {self.nested} '
+
+class DeclElse(AST):
+    """
+    Classe representando a árvore da declaração
+    de um else.
+
+    A árvore resultante:
+                else
+                 |
+               block
+    """
+    def __init__(self, op, block):
+        self.op = op
+        self.block = block
+
+    def solve(self):
+        return f' {self.op} {self.block} '
+
+class DeclFunc(AST):
+    """
+    Classe representando a árvore da declaração
+    de uma função.
+
+    A árvore resultante é parecida com:
+                  def
+                /    \\
+               /      \\
+              /        \\
+        Identifier    bloco 
+    """
+    def __init__(self, left, op, right):
         self.left = left
+        self.op = op
         self.right = right
 
     def solve(self):
-        return f'{self.left} {self.right}'
+        return f' {self.left} {self.op} {self.right} '
 
 class DeclPrint(AST):
+    """
+    Classe representando a árvore da
+    declaração de um print.
 
+    A árvore deve obedecer o seguinte modelo:
+                    print
+                      |
+                     expr
+    """
     def __init__(self, op, left):
         self.op = op   # print
-        self.left = left # expr
-
-    def solve(self):
-        return f'{self.left} {self.op}'
-
-class DeclRet(AST):
-
-    def __init__(self, op, left):
-        self.op = op   # return
         self.left = left # expr
 
     def solve(self):
@@ -125,22 +188,25 @@ class DeclRange(AST):
     def solve(self):
         return f'{self.left} {self.mid} {self.father} {self.right}'
 
-
-class DeclFuncCall(AST):
+class DeclWhile(AST):
     """
-    Classe representado a chamada de uma função.
+    Classe da declaração de uma árvore de 
+    um laço de repetição while.
 
-    A árvore será estruturada da seguinte maneira:
-            identifier                                       identifier
-                |          ou, de maneira equivalente       /   ..... \\
-            DeclParam                                     Node  .....  Node
+    A árvore resultante deve seguir o determinado modelo abaixo:
+        
+            while
+           /    \\
+        expr    [bloco]
+
     """
-    def __init__(self, left, right):
+    def __init__(self, left, op, right):
         self.left = left
+        self.op = op
         self.right = right
 
     def solve(self):
-        return f'{self.left} {self.right}'
+        return f' {self.left} {self.op} {self.right} '
 
 class Node(AST):
     """
@@ -275,7 +341,7 @@ class Interpreter():
         Método que implementa a declaração de variaveis
         decl_variavel -> IDENTIFIER opr_atrib expr
                        | IDENTIFIER opr_atrib decl_input
-                       | IDENTIFIER( decl_param )
+                       | IDENTIFIER( )
         """
 
         if self.current_token.type == "IDENTIFIER":
@@ -296,20 +362,9 @@ class Interpreter():
             else:
                 if self.current_token.type == "(":
                     self.eat()
-                    b = self.decl_param()
                     if self.current_token.type == ")":
                         self.eat() 
-                        if b is not None:
-                            print("Ola o b: ",b)
-                            if isinstance(b,tuple):
-                                l = self.expand_tuple(b,[])
-                                print("Aqui: ",l)
-                                node = DeclFuncCall(Node(c),l)
-                            else:
-                                node = DeclFuncCall(Node(c),Node(b)) 
-                            return node
-                        else:
-                            return Node(c)
+                        return Node(c)
 
         # Qualquer token/produção que não siga a definição da
         # gramática, retorna None
@@ -367,7 +422,8 @@ class Interpreter():
 
         if block is not None:
             if rng is not None:  # Se o FOR baseou-se em RANGE
-                node = DeclFor(rng,Node(declpai),block)
+                innernode = BinOp(Node(a),Node(b),rng)
+                node = DeclFor(innernode,Node(declpai),block)
                 return node      # retorna somente o bloco
             elif c is not None:  # Se o FOR baseou-se em STRING 
                 innernode = BinOp(Node(a),Node(b),Node(c))
@@ -383,6 +439,7 @@ class Interpreter():
         decl_while -> WHILE expr : bloco
         """
         if self.current_token.type == "WHILE":
+            c = self.current_token 
             self.eat()               # Consome o token WHILE
             a = self.expr()          # e tenta derivação para uma expressão
             if a is None:            # caso essa expressão não seja bem sucedida
@@ -393,7 +450,7 @@ class Interpreter():
                     b = self.bloco() # tenta derivar para um bloco
 
                     if b is not None:
-                        return (a,b) # Retorna a expressão e o bloco
+                        return (a,Node(c),b) # Retorna a expressão e o bloco
 
         # Caso o token saia de qualquer possibilidade apresentada.
         return None
@@ -401,20 +458,21 @@ class Interpreter():
     def decl_func(self):
         """
         Método que implementa a declaração de uma função
-        decl_func -> DEF IDENTIFIER ( [decl_param] ) : bloco
+        decl_func -> DEF IDENTIFIER () : bloco
         """
 
         rel_pos = 0 # Posição relativa a declaração
-        a = None    # resposta possível para os parâmetros
-        b = None    # resposta possível para o bloco
+        block = None    # resposta possível para o bloco
 
-        while rel_pos < 7:
+        while rel_pos < 6:
 
             if self.current_token.type == "DEF" and rel_pos == 0:
+                a = self.current_token
                 self.eat()  # Consome DEF
                 rel_pos+=1
 
             elif self.current_token.type == "IDENTIFIER" and rel_pos == 1:
+                b = self.current_token
                 self.eat()  # Consome IDENTIFIER
                 rel_pos+=1
 
@@ -422,34 +480,27 @@ class Interpreter():
                 self.eat() # Consome (
                 rel_pos+=1
 
-            # Declaração de parametros é opcional
-            elif rel_pos == 3:
-                a = self.decl_param() # Tenta derivação de parâmetros
-                rel_pos+=1
-
-            elif self.current_token.type == ")" and rel_pos == 4:
+            elif self.current_token.type == ")" and rel_pos == 3:
                 self.eat()   # Consome )
                 rel_pos+=1
 
-            elif self.current_token.type == ":" and rel_pos == 5:
+            elif self.current_token.type == ":" and rel_pos == 4:
                 self.eat()   # Consome :
                 rel_pos+=1
 
-            elif rel_pos == 6:
-                b = self.bloco() # Tenta derivação para um bloco
+            elif rel_pos == 5:
+                block = self.bloco() # Tenta derivação para um bloco
                 rel_pos+=1
 
             else:
                 return None
         
-        if b is not None:
-            if a is None:
-                return ("DEF",b)
-            else:
-                return (a,b)
-
-        return False
-    
+        if block is not None:
+            l = self.expand_tuple(block, [])
+            node = DeclFunc(Node(b), Node(a), l)
+            return node
+        
+        return None
 
     def decl_if(self):
         """
@@ -469,19 +520,21 @@ class Interpreter():
                 b = self.bloco() 
                 if b is None:   # O conteúdo dentro do IF não pode
                     return None # ser vazio, retorne None.
-                else:                            # Se existe conteúdo dentro do if, é possível
+                else:           # Se existe conteúdo dentro do if, é possível
                     l = self.expand_tuple(b,[])
 
                     elif_resp = self.decl_elif() # utilizar um elif,
                     if elif_resp is not None:
-                        return (a,b,elif_resp)
+                        node = DeclIf(a,Node(c),l,elif_resp)
+                        return node
                     else:                       # um else
                         else_resp = self.decl_else()
                         if else_resp is not None:
-                            return (a,b,else_resp)
+                            node = DeclIf(a,Node(c),l,else_resp)
+                            return node
 
                         else:
-                            return (a,c,l)         # ou somente a estrutura do IF.
+                            return DeclIf(a,Node(c),l)         # ou somente a estrutura do IF.
 
     def decl_elif(self):
         """
@@ -490,6 +543,7 @@ class Interpreter():
         """
 
         if self.current_token.type == "ELIF":
+            el = self.current_token
             self.eat()                      # Consome o token ELIF
             a = self.expr()                 # Tenta derivar a expressão
             if a is None:                   # caso falhe,
@@ -503,15 +557,20 @@ class Interpreter():
 
                     c = self.decl_elif()    # Tenta derivar um novo elif
                     if c is not None:       # se a derivação foi bem sucedida,
-                        return (a,b,c)      # Retorna.
+                        l = self.expand_tuple(b,[])
+                        node = DeclElif(a,Node(el),l,c)
+                        return node         # Retorna.
 
                     c = self.decl_else()    # Caso a derivação elif não funcionou
                     if c is not None:       # tenta derivar um ELSE
-                        return (a,b,c)      # e retorná-lo.
+                        l = self.expand_tuple(b,[])
+                        node = DeclElif(a,Node(el),l,c)
+                        return node         # e retorná-lo.
                     
                     # Caso nenhuma derivação entre elif e else
                     # seja concretizada, retorna somente o ELIF inicial.
-                    return (a,b)
+                    node = DeclElif(a,Node(el),l)
+                    return node         # Retorna.
         else:
             return None
 
@@ -527,7 +586,8 @@ class Interpreter():
                 self.eat()               # Consome o token :
                 b = self.bloco()         # Tenta derivar um bloco
                 if b is not None:        # Caso a derivação seja bem sucedida
-                    return (a,b)    # retorna o ELSE mais o bloco.
+                    l = self.expand_tuple(b,[])
+                    return DeclElse(Node(a),l) # retorna o ELSE mais o bloco.
                 else:
                     return None
         else:
@@ -554,10 +614,6 @@ class Interpreter():
                     self.eat()      # Consome BREAK
                     return Node(c)  # retorna o token reconhecido.
 
-                a = self.decl_ret() # Tenta derivar para uma declaração de retorno.
-                if a is not None:   # Caso a tentativa retorne sucesso
-                    return a        # retorna a resposta da derivação
-
                 a = self.decl(False) # Tenta derivar para uma declaração genérica.
                 if a is not None:   # Se a tentativa retornar sucesso
                     b = self.bloco()
@@ -569,22 +625,6 @@ class Interpreter():
     
         return None         # retorna None para nova avaliação.
 
-
-    def decl_ret(self):
-        """
-        Método que resolve a declaração de um RETURN
-        decl_ret -> RETURN expr
-        """
-        if self.current_token.type == "RETURN":
-            a = self.current_token
-            self.eat()      # Consome o token RETURN
-            c = self.expr()
-            if c is not None:
-                node = DeclRet(a,c)
-                return node
-        # Caso a declaração não foi realizada de forma satisfatória
-        return None 
-    
     def decl_input(self):
         """
         Método que resolve a declaração de um INPUT.
@@ -627,25 +667,6 @@ class Interpreter():
 
         return None
     
-    def decl_param(self):
-        """
-        Método que define uma declaração de parâmetros.
-        decl_param -> IDENTIFIER
-                    | IDENTIFIER, decl_param
-        """
-        if self.current_token.type == "IDENTIFIER":
-            b = self.current_token
-            self.eat()
-            if self.current_token.type == ",":
-                self.eat()
-                a = self.decl_param()
-
-                if a is not None:
-                    return (Node(b),a)
-            else:
-                return Node(b)
-        return None
-        
     def decl_range(self):
         """
         Método que resolve a declaração de um RANGE
