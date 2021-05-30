@@ -51,7 +51,8 @@ class DeclOp(AST):
         self.right = right
 
     def solve(self):
-         return f'{self.left} {self.op} {self.right}' 
+         # return f'{self.left} {self.op} {self.right}' 
+         return [self.left, self.op, self.right]
 
 class DeclIf(AST):
     """
@@ -214,9 +215,84 @@ class Node(AST):
     """
     def __init__(self, token):
         self.token = token
+        self.value = token.value
 
     def solve(self):
         return f' {self.token.value} '
+
+class NodeVisitor(object):
+    """
+    Classe responsável por visitar cada nó da AST.
+    """
+
+    def visit(self, node):
+        """
+        Método que visita o nó.
+        
+        Método que acessa uma função recursiva para a resolução dos nós
+        da AST gerada pelo Parser.
+
+        Parameters:
+        -----------
+        node (object): Um objeto do tipo das classes que formam
+        os nós da AST gerada pelo Parser.
+
+        Return:
+        Tupla contendo os nós da árvore lida.
+        """
+        node_name =  'visit_' + type(node).__name__
+        visitor = getattr(self, node_name, self.visit_error)
+        return visitor(node)
+
+    def visit_error(self,node):
+        """
+        Método de erro de visita.
+        Gera uma exceção de erro de acesso do nó. 
+        """
+        raise Exception ('Sem nós visit_{}'.format(type(node).__name__))
+
+class Visitor(NodeVisitor):
+    """
+    Classe que acessa cada tipo de nó da AST retornando seus dados.
+    """
+    def __init__(self, tree):
+        self.tree = tree
+
+    def visit_DeclOp(self, node):
+        """
+        Método que resolve uma AST de declaração de variáveis.
+        """
+        return self.visit(node.left), self.visit(node.op), self.visit(node.right)
+
+    def visit_BinOp(self, node):
+        """
+        Método que resolve uma AST de expressão binária.
+        """
+        return self.visit(node.left), self.visit(node.op), self.visit(node.right)
+
+    def visit_DeclPrint(self, node):
+        """
+        Método que resolve uma AST de declaração de impressão.
+        """
+        return self.visit(node.left), self.visit(node.op)
+
+    def visit_Node(self, node):
+        """
+        Método que resolve um nó, retornando seu valor.
+        """
+        return node.value
+
+    def visit_Token(self, node):
+        """
+        Método que resolve um token, o nível mais baixo de toda AST.
+        """
+        return node.value
+
+    def visitall(self):
+        """
+        Método que resolve uma AST completa.
+        """
+        return self.visit(self.tree)
 
 class Interpreter():
     def __init__(self, token_list):
@@ -230,6 +306,8 @@ class Interpreter():
         self.current_token = self.token_list[self.pos]
 
         self.recognized = []
+
+        self.c = []
 
         self.lang_loop()
 
@@ -307,7 +385,12 @@ class Interpreter():
                 return
 
         print("Reconhecidos: ",self.recognized)
-        print([x for x in a])
+        self.c = [x for x in a]
+
+        
+       
+    def retornaarvores(self):
+        return self.c
 
     def decl(self, consider_newline):
         """
@@ -351,13 +434,13 @@ class Interpreter():
             if a is not None:                   # se o operador de atribuição foi encontrado
                 b = self.expr()                 # tenta derivar uma expressão.
                 if b is not None:               # Se a derivação foi bem sucedida
-                    node = DeclOp(c, a, b)
+                    node = DeclOp(Node(c), Node(a), b)
                     return node                 # retorna a expressão reconhecida.
 
                 else:                           # A declaração de expressão não foi concretizada.
                     b = self.decl_input()       # Verifica se um input foi definido
                     if b is not None:           # retorna a expressão reconhecida.
-                        node = DeclOp(c,a,b)
+                        node = DeclOp(Node(c),Node(a),b)
                         return node
             else:
                 if self.current_token.type == "(":
@@ -658,7 +741,7 @@ class Interpreter():
                 if resposta is not None:               # caso a derivação funcione
                     if self.current_token.type == ")": # tenta fechar o parentese
                         self.eat()                     # consome o token )
-                        node = DeclPrint(a,resposta)
+                        node = DeclPrint(Node(a),resposta)
                         return node                    # retorna a expressão.
                     else:                              # Se não fechou parenteses
                         return None                    # retorna erro!
