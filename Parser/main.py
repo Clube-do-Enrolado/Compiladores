@@ -1,14 +1,22 @@
 from lexicalAnalyser import *
-from parser import *
-
+from parserfinal import *
+from codeGenerator import *
 
 lexer = Lexer()
-token_objs =[]
 
-
-with open('code.txt') as f:
+with open('code.txt','r') as f:
     token_list = lexer.getTokens(f.read())
 
 f.close()
 
 interpreter = Interpreter(token_list)
+
+
+tree = interpreter.retornaarvores()
+a = []
+for t in tree:
+    vis = Visitor(t)
+    a.append(vis.visitall())
+
+code = Generator(a)
+code.generate_code()
