@@ -1,0 +1,8 @@
+def funcao():
+	a = 5.0
+	for i in range(1,20,2):
+		a += i
+		print(a)
+	if a > 40:
+		print("Maior que 40")
+funcao()
