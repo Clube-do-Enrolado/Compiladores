@@ -1,7 +1,6 @@
 from lexicalAnalyser import *
 from parserTitanoboa import *
 from codeGenerator import *
-from symbolTable import *
 
 
 class Titanoboa:

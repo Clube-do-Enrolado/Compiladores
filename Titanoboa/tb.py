@@ -1,7 +1,5 @@
-print ("Digite duas palavras iguais")
-a = input()
-b = input()
-if a == b:
-	print ("Obrigado, tenha um otimo dia :D")
-else:
-	print (">:(")
+a = 0
+while a < 10:
+	print (a * a)
+	a += 1
+
